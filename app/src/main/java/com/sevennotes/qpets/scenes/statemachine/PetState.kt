@@ -7,7 +7,18 @@ import com.sevennotes.qpets.scenes.animation.AnimationStateMachine
 import com.sevennotes.qpets.scenes.animation.EffectAnimation
 import com.sevennotes.qpets.scenes.animation.EffectAnimationStateMachine
 import com.sevennotes.qpets.scenes.animation.PetAnimation
+import com.sevennotes.qpets.scenes.behaviourtree.BTStatus.*
+import com.sevennotes.qpets.scenes.behaviourtree.BehaviourTreeManager
+import com.sevennotes.qpets.scenes.behaviourtree.DecNode
+import com.sevennotes.qpets.scenes.behaviourtree.Node
+import com.sevennotes.qpets.scenes.behaviourtree.action
+import com.sevennotes.qpets.scenes.behaviourtree.condition
+import com.sevennotes.qpets.scenes.behaviourtree.conditionAction
+import com.sevennotes.qpets.scenes.behaviourtree.invertConditionAction
+import com.sevennotes.qpets.scenes.behaviourtree.selector
+import com.sevennotes.qpets.scenes.behaviourtree.sequence
 import com.sevennotes.qpets.scenes.common.Timer
+import com.sevennotes.qpets.utils.RandomUtil
 import com.sevennotes.qpets.utils.TimeUtils
 import korlibs.time.TimeSpan
 import org.greenrobot.eventbus.EventBus
@@ -21,32 +32,100 @@ enum class PetStates : UniversalState {
   PLAYING,
 }
 
-sealed class PetState(
-  val animationStateMachine: AnimationStateMachine,
-  val effectAnimationStateMachine: EffectAnimationStateMachine
-) : StateImpl() {
+class PetBTManager : BehaviourTreeManager<StateMachine>() {
+  private val hungryTimer: Timer = Timer(10.0)
+  private val idleTimer: Timer = Timer(5.0)
+  private val walkTimer: Timer = Timer(3.0)
+  private val sleepTimer: Timer = Timer(20.0)
+  override fun createRoot(): Node<StateMachine> {
+    val root = DecNode<StateMachine>().apply {
+      beforeChildTick = { hungryUpdate() }
+    }
+    root.selector {
 
-  private val hungryTimer = Timer(10.0)
+      sequence {
+        condition { it.currentState() is PetState.IdleState }
+        selector {
 
-  override fun update(time: TimeSpan) {
-    hungryUpdate(time.seconds)
+          condition { PetGlobalData.getInstance().hungry <= 0  }
+
+          conditionAction({
+            TimeUtils.isNight() || PetGlobalData.getInstance().strength <= 0
+          }) {
+            it.changeState(PetStates.SLEEP)
+            SUCCESS
+          }
+
+          conditionAction({
+            idleTimer.stick(1.0) && RandomUtil.random10() < 3
+          }) {
+            it.changeState(PetStates.WALK)
+            SUCCESS
+          }
+
+        }
+      }
+
+      sequence {
+        condition { it.currentState() is PetState.WalkState }
+        selector {
+          conditionAction({ walkTimer.stick(1.0) && RandomUtil.random10() < 8 }) {
+            it.changeState(PetStates.IDLE)
+            walkTimer.reset()
+            SUCCESS
+          }
+          conditionAction({ RandomUtil.random100() < 8 }) {
+            it.changeState(PetStates.LOOKING)
+            SUCCESS
+          }
+        }
+      }
+
+      sequence {
+        condition { it.currentState() is PetState.SleepState }
+        sequence {
+          conditionAction({ sleepTimer.stick(1.0) }) {
+            PetGlobalData.getInstance().updateStrength(1)
+            SUCCESS
+          }
+          invertConditionAction({ TimeUtils.isNight() })  {
+            if (PetGlobalData.getInstance().isStrengthFull()) {
+              it.changeState(PetStates.IDLE)
+              SUCCESS
+            } else {
+              RUNNING
+            }
+          }
+        }
+      }
+
+    }
+    return root
   }
 
-  private fun hungryUpdate(deltaTime: Double) {
-    if (hungryTimer.stick(deltaTime)) {
-      val random = Math.random()
-      if (random < 0.3) {
+  private fun hungryUpdate() {
+    if (hungryTimer.stick(1.0)) {
+      if (RandomUtil.random10() < 3) {
         PetGlobalData.getInstance().updateHungry(-1)
       }
     }
   }
 
+}
+
+sealed class PetState(
+  val animationStateMachine: AnimationStateMachine,
+  val effectAnimationStateMachine: EffectAnimationStateMachine
+) : StateImpl() {
   companion object {
     fun initStateMachine(
       stateMachine: StateMachine,
       petAnimationStateMachine: AnimationStateMachine,
       effectAnimationStateMachine: EffectAnimationStateMachine
     ) {
+      val petBTManager = PetBTManager()
+      petBTManager.create()
+      stateMachine.setBehaviourTreeManager(petBTManager)
       stateMachine.addState(
         PetStates.IDLE,
         IdleState(petAnimationStateMachine, effectAnimationStateMachine)
@@ -79,36 +158,8 @@ sealed class PetState(
     animationStateMachine: AnimationStateMachine,
     effectAnimationStateMachine: EffectAnimationStateMachine
   ) : PetState(animationStateMachine, effectAnimationStateMachine) {
-
-    private val changePercent = 0.3
-    private val gotoSleep = 0.8
-    private val timer = Timer(5.0)
-
     override fun onEnter() {
       animationStateMachine.changeAnimationLooping(PetAnimation.IDLE)
-    }
-
-    override fun update(time: TimeSpan) {
-      //get a random number between 0 and 1
-      super.update(time)
-      if (!timer.stick(time.seconds)) return
-      val random = Math.random()
-
-      //晚上，或者体力为0, 就回去睡觉
-      if (TimeUtils.isNight() || PetGlobalData.getInstance().strength <= 0) {
-        if (random <= gotoSleep) {
-          stateMachine?.changeState(PetStates.SLEEP)
-          return
-        }
-      }
-
-      if (PetGlobalData.getInstance().hungry > 0) {
-        if (random <= changePercent) {
-          stateMachine?.changeState(PetStates.WALK)
-          return
-        }
-      }
-
     }
 
   }
@@ -122,11 +173,6 @@ sealed class PetState(
       LEFT,
       RIGHT
     }
-
-    private val changeIdle = 0.5
-    private val changeLooking = 0.1
-    private val timer = Timer(1.5)
-
     //0: left  1: right
     private var walkDirection = Direction.LEFT
 
@@ -149,28 +195,12 @@ sealed class PetState(
     }
 
     override fun update(time: TimeSpan) {
-      super.update(time)
       move(time.seconds)
-      if (!timer.stick(time.seconds)) return
-      tryChangeState()
     }
 
     private fun move(delta: Double) {
       val x = if (walkDirection == Direction.LEFT) -1 else 1
       EventBus.getDefault().post(UpdateWindowEvent(deltaX = x))
-    }
-
-    private fun tryChangeState() {
-      val random = Math.random()
-      if (PetGlobalData.getInstance().strength >= 0) {
-        if (random <= changeLooking) {
-          stateMachine?.changeState(PetStates.LOOKING)
-          return
-        }
-      }
-      if (random <= changeIdle) {
-        stateMachine?.changeState(PetStates.IDLE)
-      }
     }
 
   }
@@ -197,22 +227,9 @@ sealed class PetState(
     animationStateMachine: AnimationStateMachine,
     effectAnimationStateMachine: EffectAnimationStateMachine
   ) : PetState(animationStateMachine, effectAnimationStateMachine) {
-
-    private val tiredTimer = Timer(10.0)
-
     override fun onEnter() {
       animationStateMachine.changeAnimationLooping(PetAnimation.SLEEP)
     }
-
-    override fun update(time: TimeSpan) {
-      super.update(time)
-      if (tiredTimer.stick(time.seconds)) {
-        if (!PetGlobalData.getInstance().isStrengthFull()) {
-          PetGlobalData.getInstance().updateStrength(1)
-        }
-      }
-    }
-
   }
 
   class EatingState(
@@ -222,19 +239,16 @@ sealed class PetState(
     private val timer = Timer(2.0)
     override fun onEnter() {
       if (PetGlobalData.getInstance().isHungryFull()) {
-        //TODO 如果饱了就不吃了，切不吃了动画
         stateMachine?.changeState(PetStates.IDLE)
         return
       }
       animationStateMachine.translateAnimation(PetAnimation.LOOKING) {
-//        Log.d("test", "eat finished!")
         stateMachine?.changeState(PetStates.IDLE)
       }
       effectAnimationStateMachine.showEffectOnce(EffectAnimation.FOOD)
     }
 
     override fun onExit() {
-//      Log.d("test", "update hungry")
       PetGlobalData.getInstance().updateHungry(10)
     }
   }
