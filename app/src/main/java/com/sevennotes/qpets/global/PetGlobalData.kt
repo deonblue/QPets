@@ -2,7 +2,6 @@ package com.sevennotes.qpets.global
 
 import com.google.gson.Gson
 import com.sevennotes.qpets.events.GlobalDataEvent
-import com.sevennotes.qpets.scenes.statemachine.StateMachine
 import org.greenrobot.eventbus.EventBus
 
 
@@ -24,6 +23,9 @@ class PetGlobalData private constructor() {
    * 货币分数，用于提高宠物属性, 购置物品等等
    */
   var score: Int = 0
+    private set
+
+  var heart: Int = 0
     private set
 
   fun updateHungry(value: Int) {
@@ -75,6 +77,18 @@ class PetGlobalData private constructor() {
         this.score = 0
       }
       EventBus.getDefault().post(GlobalDataEvent.ScoreEvent(score))
+    }
+  }
+
+  fun updateHeart(value: Int) {
+    synchronized(this) {
+      heart += value
+      heart = when {
+        heart < 0 -> 0
+        heart > 100 -> 100
+        else -> heart
+      }
+      EventBus.getDefault().post(GlobalDataEvent.HartEvent(heart))
     }
   }
 

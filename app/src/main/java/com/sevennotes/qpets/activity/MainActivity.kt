@@ -89,6 +89,7 @@ fun Greeting(modifier: Modifier = Modifier, 点击释放: () -> Unit, 点击收�
     Text(text = "hungry: ${uiState.hungry}")
     Text(text = "strength: ${uiState.strength}")
     Text(text = "score: ${uiState.score}")
+    Text(text = "heart: ${uiState.heart}")
     Button(onClick = 点击释放) {
       Text(
         text = "释放宠物",

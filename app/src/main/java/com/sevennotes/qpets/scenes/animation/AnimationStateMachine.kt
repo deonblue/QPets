@@ -19,8 +19,8 @@ open class AnimationStateMachine {
   //水平翻转sprite
   fun flipSprite() {
     sprite?.let {
-      val currScalX = it.scaleX
-      it.scaleX = -currScalX
+      val currScaleX = it.scaleX
+      it.scaleX = -currScaleX
     }
   }
 

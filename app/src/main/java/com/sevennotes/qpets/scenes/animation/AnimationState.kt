@@ -10,3 +10,5 @@ abstract class AnimationState : State {
   internal abstract val animation: SpriteAnimation
   var sprite: Sprite? = null
 }
+
+

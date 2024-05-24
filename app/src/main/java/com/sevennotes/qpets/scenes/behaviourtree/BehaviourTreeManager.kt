@@ -1,6 +1,6 @@
 package com.sevennotes.qpets.scenes.behaviourtree
 
-abstract class BehaviourTreeManager<T> {
+abstract class BehaviourTreeManager<T>(private val context: T) {
 
   private var root: Node<T>? = null
   abstract fun createRoot(): Node<T>
@@ -9,7 +9,7 @@ abstract class BehaviourTreeManager<T> {
     root = createRoot()
   }
 
-  fun update(context: T) {
+  fun update() {
     root?.tick(context)
   }
 }

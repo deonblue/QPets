@@ -13,6 +13,7 @@ data class MainUIState(
   val hungry: Int = 0,
   val strength: Int = 0,
   val score: Int = 0,
+  val heart: Int = 0,
 )
 
 class MainViewModel : ViewModel() {
@@ -21,6 +22,7 @@ class MainViewModel : ViewModel() {
     hungry = PetGlobalData.getInstance().hungry,
     strength = PetGlobalData.getInstance().strength,
     score = PetGlobalData.getInstance().score,
+    heart = PetGlobalData.getInstance().heart,
   ))
   val mainUIState = _mainUIState.asStateFlow()
 
@@ -40,6 +42,10 @@ class MainViewModel : ViewModel() {
       is GlobalDataEvent.StrengthEvent -> {
         _mainUIState.update { it.copy(strength = event.value) }
       }
+      is GlobalDataEvent.HartEvent -> {
+        _mainUIState.update { it.copy(heart = event.value) }
+      }
+      else -> {}
     }
   }
 

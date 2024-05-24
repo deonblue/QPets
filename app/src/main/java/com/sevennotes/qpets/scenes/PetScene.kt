@@ -3,7 +3,7 @@ package com.sevennotes.qpets.scenes
 import android.util.Log
 import com.sevennotes.qpets.events.IsUpdatingWindow
 import com.sevennotes.qpets.events.PetEvent
-import com.sevennotes.qpets.scenes.animation.EffectAnimation
+import com.sevennotes.qpets.scenes.animation.Effects
 import com.sevennotes.qpets.scenes.animation.PetAnimation
 import com.sevennotes.qpets.scenes.animation.EffectAnimationStateMachine
 import com.sevennotes.qpets.scenes.animation.PetAnimationStateMachine
@@ -12,6 +12,7 @@ import com.sevennotes.qpets.scenes.statemachine.PetState
 import com.sevennotes.qpets.scenes.statemachine.PetStates
 import com.sevennotes.qpets.scenes.statemachine.StateImpl
 import com.sevennotes.qpets.scenes.statemachine.StateMachine
+import com.sevennotes.qpets.scenes.statemachine.UniversalState
 import com.sevennotes.qpets.utils.TimeUtils
 import com.sevennotes.qpets.viewmodel.WindowEvent
 import korlibs.image.format.ASE
@@ -27,14 +28,30 @@ import korlibs.korge.view.addUpdater
 import korlibs.korge.view.sprite
 import korlibs.math.geom.Anchor
 import korlibs.math.geom.Scale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
+class PetContext(
+  var petAnimationStateMachine: PetAnimationStateMachine,
+  var effectAnimationStateMachine: EffectAnimationStateMachine,
+  var stateMachine: StateMachine,
+  var mainScene: PetScene,
+) {
+  var clickHart: Boolean = false
+  fun changeState(state: UniversalState) {
+    stateMachine.changeState(state)
+  }
+
+  fun launch(block: suspend CoroutineScope.() -> Unit) {
+    mainScene.launch(block = block)
+  }
+
+}
 
 class PetScene : Scene(), StateMachine.StateListener {
 
-  private lateinit var petAnimationStateMachine: PetAnimationStateMachine
-  private lateinit var effectAnimationStateMachine: EffectAnimationStateMachine
-  private val stateMachine = StateMachine()
+  private lateinit var petContext: PetContext
   private var dog: Sprite? = null
   private var w: Sprite? = null
   private val longTouchTimer = Timer(0.5)
@@ -43,40 +60,47 @@ class PetScene : Scene(), StateMachine.StateListener {
   override suspend fun SContainer.sceneInit() {
     val dogAse = resourcesVfs["gfx/dog.ase"].readImageDataContainer(ASE.toProps())
     val effects = resourcesVfs["gfx/effects.ase"].readImageDataContainer(ASE.toProps())
-    petAnimationStateMachine = PetAnimationStateMachine(dogAse)
-    effectAnimationStateMachine = EffectAnimationStateMachine(effects, sceneContainer)
+    petContext = PetContext(
+      petAnimationStateMachine = PetAnimationStateMachine(dogAse),
+      effectAnimationStateMachine = EffectAnimationStateMachine(effects, sceneContainer),
+      stateMachine = StateMachine(),
+      mainScene = this@PetScene
+    )
     initStateMachine()
     EventBus.getDefault().register(this@PetScene)
   }
 
   private fun initStateMachine() {
-    PetState.initStateMachine(stateMachine, petAnimationStateMachine, effectAnimationStateMachine)
-    stateMachine.addStateListener(this)
+    PetState.initStateMachine(petContext)
+    petContext.stateMachine.addStateListener(this)
   }
 
   @Subscribe
   fun onPetEvent(petEvent: PetEvent) {
     when (petEvent) {
       PetEvent.PetIdle -> {
-        stateMachine.changeState(PetStates.IDLE)
+        petContext.changeState(PetStates.IDLE)
       }
 
       PetEvent.PetSleep -> {
-        stateMachine.changeState(PetStates.SLEEP)
+        petContext.changeState(PetStates.SLEEP)
       }
 
       PetEvent.PetLooking -> {
-        stateMachine.changeState(PetStates.LOOKING)
+        petContext.changeState(PetStates.LOOKING)
       }
 
       PetEvent.PetEating -> {
-        if (stateMachine.currentState() is PetState.IdleState) {
-          stateMachine.changeState(PetStates.EATING)
+        if (
+          petContext.stateMachine.currentState() is PetState.IdleState ||
+          petContext.stateMachine.currentState() is PetState.WalkState
+        ) {
+          petContext.changeState(PetStates.EATING)
         }
       }
 
       PetEvent.PetPlaying -> {
-        stateMachine.changeState(PetStates.PLAYING)
+        petContext.changeState(PetStates.PLAYING)
       }
 
       else -> {}
@@ -92,7 +116,7 @@ class PetScene : Scene(), StateMachine.StateListener {
 
   override suspend fun SContainer.sceneMain() {
 
-    petAnimationStateMachine.createSprite(PetAnimation.IDLE) { animation ->
+    petContext.petAnimationStateMachine.createSprite(PetAnimation.IDLE) { animation ->
       animation?.let {
         dog = sprite(animation, Anchor.BOTTOM_CENTER) {
           x = 50f
@@ -100,7 +124,9 @@ class PetScene : Scene(), StateMachine.StateListener {
           scale = Scale(2.7f, 2.7f)
 
           onClick {
-            Log.d("test", "clicked")
+            petContext.effectAnimationStateMachine.showEffect(Effects.HEART)
+            petContext.changeState(PetStates.IDLE)
+            petContext.clickHart = true
           }
 
         }
@@ -118,14 +144,6 @@ class PetScene : Scene(), StateMachine.StateListener {
       }
     }
 
-    effectAnimationStateMachine.createSprite(EffectAnimation.BALL) { animation ->
-
-      animation?.let {
-        w = Sprite(animation, Anchor.CENTER)
-        w
-      }
-    }
-
     initState()
 
     addUpdater {
@@ -137,17 +155,16 @@ class PetScene : Scene(), StateMachine.StateListener {
         }
       }
 
-      stateMachine.update(it)
-
+      petContext.stateMachine.update(it)
     }
 
   }
 
   private fun initState() {
     if (TimeUtils.isNight()) {
-      stateMachine.changeState(PetStates.SLEEP)
+      petContext.changeState(PetStates.SLEEP)
     } else {
-      stateMachine.changeState(PetStates.IDLE)
+      petContext.changeState(PetStates.IDLE)
     }
   }
 

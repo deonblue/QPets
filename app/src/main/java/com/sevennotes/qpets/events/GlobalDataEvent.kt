@@ -7,4 +7,5 @@ sealed class GlobalDataEvent {
   class HungryEvent(val value: Int) : GlobalDataEvent()
   class StrengthEvent(val value: Int) : GlobalDataEvent()
   class ScoreEvent(val value: Int) : GlobalDataEvent()
+  class HartEvent(val value: Int) : GlobalDataEvent()
 }

@@ -1,5 +1,6 @@
 package com.sevennotes.qpets.scenes.statemachine
 
+import com.sevennotes.qpets.scenes.PetContext
 import com.sevennotes.qpets.scenes.behaviourtree.BehaviourTreeManager
 import com.sevennotes.qpets.scenes.common.Timer
 import korlibs.time.TimeSpan
@@ -10,10 +11,10 @@ class StateMachine {
   private var currentState: StateImpl? = null
   private val states: MutableMap<String, StateImpl> = mutableMapOf()
   private val listeners: MutableList<StateListener> = mutableListOf()
-  private var behaviourTreeManager: BehaviourTreeManager<StateMachine>? = null
+  private var behaviourTreeManager: BehaviourTreeManager<PetContext>? = null
   private val btTimer: Timer = Timer(1.0)
 
-  fun setBehaviourTreeManager(btm: BehaviourTreeManager<StateMachine>) {
+  fun setBehaviourTreeManager(btm: BehaviourTreeManager<PetContext>) {
     behaviourTreeManager = btm
   }
 
@@ -24,7 +25,7 @@ class StateMachine {
 
   fun update(time: TimeSpan) {
     if (btTimer.stick(time.seconds)) {
-      behaviourTreeManager?.update(this)
+      behaviourTreeManager?.update()
     }
     currentState?.update(time)
   }
