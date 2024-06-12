@@ -9,6 +9,11 @@ import korlibs.time.TimeSpan
 abstract class AnimationState : State {
   internal abstract val animation: SpriteAnimation
   var sprite: Sprite? = null
+
+  override fun onEnter() {
+
+  }
+
 }
 
 

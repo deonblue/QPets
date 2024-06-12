@@ -60,6 +60,8 @@ dependencies {
   implementation(libs.androidx.lifecycle.service)
   implementation(libs.androidx.lifecycle.common)
   implementation(libs.androidx.appcompat)
+  implementation (libs.androidx.datastore)
+  implementation (libs.androidx.datastore.preferences)
 
 
   //Gson

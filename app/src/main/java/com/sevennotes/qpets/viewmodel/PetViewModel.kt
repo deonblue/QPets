@@ -16,7 +16,7 @@ import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 
 data class WindowState(
-  val size: Dp = 100.dp,
+  val size: Dp = 80.dp,
   val showMenu: Boolean = false,
 )
 
@@ -55,7 +55,6 @@ class PetViewModel : ViewModel() {
   }
 
   fun changeSize(value: Dp) {
-    Log.d("test", "change size!!! in viewModel: $this")
     _windowState.update {
       val newSize = it.size + value
       it.copy(size = newSize)

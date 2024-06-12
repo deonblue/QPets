@@ -4,10 +4,13 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 
 class MyPetApplication : Application(), ViewModelStoreOwner {
 
   private lateinit var myViewModelStore: ViewModelStore
+  val scope = CoroutineScope(Dispatchers.IO)
 
   override fun onCreate() {
     super.onCreate()

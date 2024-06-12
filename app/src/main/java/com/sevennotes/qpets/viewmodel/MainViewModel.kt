@@ -1,10 +1,16 @@
 package com.sevennotes.qpets.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.sevennotes.qpets.events.GlobalDataEvent
 import com.sevennotes.qpets.global.PetGlobalData
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
@@ -18,39 +24,16 @@ data class MainUIState(
 
 class MainViewModel : ViewModel() {
 
-  private val _mainUIState = MutableStateFlow(MainUIState(
-    hungry = PetGlobalData.getInstance().hungry,
-    strength = PetGlobalData.getInstance().strength,
-    score = PetGlobalData.getInstance().score,
-    heart = PetGlobalData.getInstance().heart,
-  ))
-  val mainUIState = _mainUIState.asStateFlow()
-
-  init {
-    EventBus.getDefault().register(this)
-  }
-
-  @Subscribe
-  fun globalDataUpdate(event: GlobalDataEvent) {
-    when (event) {
-      is GlobalDataEvent.HungryEvent -> {
-        _mainUIState.update { it.copy(hungry = event.value) }
-      }
-      is GlobalDataEvent.ScoreEvent -> {
-        _mainUIState.update { it.copy(score = event.value) }
-      }
-      is GlobalDataEvent.StrengthEvent -> {
-        _mainUIState.update { it.copy(strength = event.value) }
-      }
-      is GlobalDataEvent.HartEvent -> {
-        _mainUIState.update { it.copy(heart = event.value) }
-      }
-      else -> {}
-    }
-  }
-
-  override fun onCleared() {
-    EventBus.getDefault().unregister(this)
+  val mainUIState = flow {
+    emit(MainUIState())
+  }.combine(PetGlobalData.getInstance().hungryFlow) { state, hungry ->
+    state.copy(hungry = hungry)
+  }.combine(PetGlobalData.getInstance().strengthFlow) { state, strength ->
+    state.copy(strength = strength)
+  }.combine(PetGlobalData.getInstance().scoreFlow) { state, score ->
+    state.copy(score = score)
+  }.combine(PetGlobalData.getInstance().heartFlow) { state, heart ->
+    state.copy(heart = heart)
   }
 
 }

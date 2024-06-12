@@ -9,4 +9,9 @@ sealed class PetEvent {
   data object PetLooking : PetEvent()
   data object PetEating: PetEvent()
   data object PetPlaying: PetEvent()
+
+  /**
+   * 宠物是否在家
+   */
+  data class PetHomeState(val state: Boolean): PetEvent()
 }

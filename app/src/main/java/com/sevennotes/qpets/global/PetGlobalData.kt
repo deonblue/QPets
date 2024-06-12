@@ -1,11 +1,20 @@
 package com.sevennotes.qpets.global
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import com.google.gson.Gson
-import com.sevennotes.qpets.events.GlobalDataEvent
-import org.greenrobot.eventbus.EventBus
+import com.sevennotes.qpets.MyPetApplication
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import java.io.File
 
-
-class PetGlobalData private constructor() {
+class PetGlobalData private constructor(
+  private val dataStore: DataStore<Preferences>
+) {
 
   /**
    * 饥饿值 取值范围0-100
@@ -25,21 +34,47 @@ class PetGlobalData private constructor() {
   var score: Int = 0
     private set
 
+  /**
+   * 心情
+   */
   var heart: Int = 0
     private set
 
-  fun updateHungry(value: Int) {
-    //如果value 为负数， 那么表示hungry减少， 但是hungry最少为0. 如果value为正数，那么表示hungry增加，但是hungry最多为100
-    synchronized(this) {
-      hungry += value
+  var outSide: Boolean = false
 
-      hungry = when {
-        hungry < 0 -> 0
-        hungry > 100 -> 100
-        else -> hungry
+  private val hungryKey = intPreferencesKey("hungry")
+  private val strengthKey = intPreferencesKey("strength")
+  private val scoreKey = intPreferencesKey("score")
+  private val heartKey = intPreferencesKey("heart")
+
+  val hungryFlow: Flow<Int> = dataStore.data.map { preference ->
+    hungry = preference[hungryKey] ?: hungry
+    hungry
+  }
+  val strengthFlow: Flow<Int> = dataStore.data.map { preference ->
+    strength = preference[strengthKey] ?: strength
+    strength
+  }
+  val scoreFlow: Flow<Int> = dataStore.data.map { preference ->
+    score = preference[scoreKey] ?: score
+    score
+  }
+  val heartFlow: Flow<Int> = dataStore.data.map { preference ->
+    heart = preference[heartKey] ?: heart
+    heart
+  }
+
+  //更新属性的通用方法
+  private fun <T> updatePreference(key: Preferences.Key<T>, value: T) {
+    MyPetApplication.getInstance().scope.launch {
+      dataStore.edit { preferences ->
+        preferences[key] = value
       }
-      EventBus.getDefault().post(GlobalDataEvent.HungryEvent(hungry))
     }
+  }
+
+  fun updateHungry(value: Int) {
+    updatePreference(hungryKey, (hungry + value).coerceIn(0, 100))
   }
 
   /**
@@ -57,46 +92,38 @@ class PetGlobalData private constructor() {
   }
 
   fun updateStrength(value: Int) {
-    synchronized(this) {
-      strength += value
-
-      strength = when {
-        strength < 0 -> 0
-        strength > 10 -> 10
-        else -> strength
-      }
-      EventBus.getDefault().post(GlobalDataEvent.StrengthEvent(strength))
-    }
+    updatePreference(strengthKey, (strength + value).coerceIn(0, 10))
   }
 
   fun updateScore(value: Int) {
-    synchronized(this) {
-      score += value
+    var newScore = score + value
 
-      if (this.score < 0) {
-        this.score = 0
-      }
-      EventBus.getDefault().post(GlobalDataEvent.ScoreEvent(score))
+    if (newScore < 0) {
+      newScore = 0
     }
+    updatePreference(scoreKey, newScore)
   }
 
   fun updateHeart(value: Int) {
-    synchronized(this) {
-      heart += value
-      heart = when {
-        heart < 0 -> 0
-        heart > 100 -> 100
-        else -> heart
-      }
-      EventBus.getDefault().post(GlobalDataEvent.HartEvent(heart))
-    }
+    updatePreference(heartKey, (heart + value).coerceIn(0, 100))
   }
 
   companion object {
-    private var instance: PetGlobalData = PetGlobalData()
+    private var instance: PetGlobalData? = null
     private val gson = Gson()
     fun getInstance(): PetGlobalData {
-      return instance
+      if (instance == null) {
+        instance = PetGlobalData(
+          PreferenceDataStoreFactory.create {
+            File(MyPetApplication.getInstance().filesDir, "pet_data.preferences_pb").apply {
+              if (!exists()) {
+                createNewFile()
+              }
+            }
+          }
+        )
+      }
+      return instance!!
     }
 
     fun fromJson(json: String) {

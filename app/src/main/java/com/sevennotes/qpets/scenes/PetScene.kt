@@ -3,9 +3,9 @@ package com.sevennotes.qpets.scenes
 import android.util.Log
 import com.sevennotes.qpets.events.IsUpdatingWindow
 import com.sevennotes.qpets.events.PetEvent
+import com.sevennotes.qpets.scenes.animation.EffectAnimationStateMachine
 import com.sevennotes.qpets.scenes.animation.Effects
 import com.sevennotes.qpets.scenes.animation.PetAnimation
-import com.sevennotes.qpets.scenes.animation.EffectAnimationStateMachine
 import com.sevennotes.qpets.scenes.animation.PetAnimationStateMachine
 import com.sevennotes.qpets.scenes.common.Timer
 import com.sevennotes.qpets.scenes.statemachine.PetState
@@ -23,7 +23,6 @@ import korlibs.korge.input.onClick
 import korlibs.korge.input.touch
 import korlibs.korge.scene.Scene
 import korlibs.korge.view.SContainer
-import korlibs.korge.view.Sprite
 import korlibs.korge.view.addUpdater
 import korlibs.korge.view.sprite
 import korlibs.math.geom.Anchor
@@ -32,6 +31,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
+
 class PetContext(
   var petAnimationStateMachine: PetAnimationStateMachine,
   var effectAnimationStateMachine: EffectAnimationStateMachine,
@@ -43,6 +43,10 @@ class PetContext(
     stateMachine.changeState(state)
   }
 
+  inline fun <reified T> isInState(): Boolean {
+    return stateMachine.currentState() is T
+  }
+
   fun launch(block: suspend CoroutineScope.() -> Unit) {
     mainScene.launch(block = block)
   }
@@ -52,9 +56,8 @@ class PetContext(
 class PetScene : Scene(), StateMachine.StateListener {
 
   private lateinit var petContext: PetContext
-  private var dog: Sprite? = null
-  private var w: Sprite? = null
   private val longTouchTimer = Timer(0.5)
+  private val clickHeartTimer = Timer(1.0)
   private var needLongTouch: Boolean = false
 
   override suspend fun SContainer.sceneInit() {
@@ -77,6 +80,7 @@ class PetScene : Scene(), StateMachine.StateListener {
 
   @Subscribe
   fun onPetEvent(petEvent: PetEvent) {
+    if (petEvent !is PetEvent.PetEating && petContext.isInState<PetState.DieState>()) return
     when (petEvent) {
       PetEvent.PetIdle -> {
         petContext.changeState(PetStates.IDLE)
@@ -92,8 +96,9 @@ class PetScene : Scene(), StateMachine.StateListener {
 
       PetEvent.PetEating -> {
         if (
-          petContext.stateMachine.currentState() is PetState.IdleState ||
-          petContext.stateMachine.currentState() is PetState.WalkState
+          petContext.isInState<PetState.IdleState>() ||
+          petContext.isInState<PetState.WalkState>() ||
+          petContext.isInState<PetState.DieState>()
         ) {
           petContext.changeState(PetStates.EATING)
         }
@@ -118,19 +123,25 @@ class PetScene : Scene(), StateMachine.StateListener {
 
     petContext.petAnimationStateMachine.createSprite(PetAnimation.IDLE) { animation ->
       animation?.let {
-        dog = sprite(animation, Anchor.BOTTOM_CENTER) {
+        /**
+         * 这是狗的主sprite
+         */
+        sprite(animation, Anchor.BOTTOM_CENTER) {
           x = 50f
           y = 100f
           scale = Scale(2.7f, 2.7f)
 
           onClick {
+
+            if (petContext.isInState<PetState.DieState>()) return@onClick
+
             petContext.effectAnimationStateMachine.showEffect(Effects.HEART)
-            petContext.changeState(PetStates.IDLE)
+            petContext.changeState(PetStates.PLAYING)
+            clickHeartTimer.reset()
             petContext.clickHart = true
           }
-
         }
-        dog
+
       }
     }
 
@@ -152,6 +163,12 @@ class PetScene : Scene(), StateMachine.StateListener {
         if (longTouchTimer.stick(it.seconds)) {
           needLongTouch = false
           EventBus.getDefault().post(WindowEvent.MenuShow)
+        }
+      }
+
+      if (petContext.clickHart) {
+        if (clickHeartTimer.stick(it.seconds)) {
+          petContext.clickHart = false
         }
       }
 
