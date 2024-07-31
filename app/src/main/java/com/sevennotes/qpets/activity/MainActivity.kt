@@ -3,6 +3,7 @@ package com.sevennotes.qpets.activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -18,8 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,11 +35,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sevennotes.qpets.R
 import com.sevennotes.qpets.events.PetEvent
 import com.sevennotes.qpets.scenes.mainStage
 import com.sevennotes.qpets.service.PetService
@@ -72,14 +73,22 @@ class MainActivity : ComponentActivity() {
               checkPermissionToOpen {
                 val intent = Intent(this, PetService::class.java)
                 intent.putExtra("action", "start")
-                startService(intent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                  startForegroundService(intent)
+                } else {
+                  startService(intent)
+                }
               }
             },
             点击收回 = {
               checkPermissionToOpen {
                 val intent = Intent(this, PetService::class.java)
                 intent.putExtra("action", "end")
-                startService(intent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                  startForegroundService(intent)
+                } else {
+                  startService(intent)
+                }
               }
             })
         }
@@ -171,7 +180,7 @@ fun Greeting(
     ) {
       Row {
         Row(modifier = Modifier.padding(start = 10.dp, top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-          Icon(modifier = Modifier.size(45.dp), imageVector = Icons.Filled.Face, contentDescription = "", tint = Color.Yellow)
+          Icon(modifier = Modifier.size(45.dp), painter = painterResource(id = R.drawable.gameiconscrowncoin), contentDescription = "", tint = Color.Yellow)
           Spacer(modifier = Modifier.width(10.dp))
           Text(text = "${uiState.score}", color = Color.Yellow, fontSize = 25.sp)
         }

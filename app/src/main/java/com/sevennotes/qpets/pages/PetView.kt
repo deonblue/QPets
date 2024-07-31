@@ -5,38 +5,23 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.graphics.PixelFormat
-import android.graphics.Point
-import android.hardware.SensorManager
 import android.os.Build
-import android.text.BoringLayout.Metrics
-import android.util.DisplayMetrics
 import android.util.Log
-import android.view.Gravity
-import android.view.OrientationEventListener
 import android.view.WindowManager
 import android.view.WindowManager.LayoutParams
 import android.widget.Toast
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
-import androidx.compose.ui.platform.ViewConfiguration
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
@@ -48,12 +33,13 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.sevennotes.qpets.MyPetApplication
 import com.sevennotes.qpets.events.IsUpdatingWindow
+import com.sevennotes.qpets.events.PetEvent
 import com.sevennotes.qpets.events.UpdateWindowEvent
+import com.sevennotes.qpets.global.PetGlobalData
 import com.sevennotes.qpets.viewmodel.PetViewModel
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
-import kotlin.properties.Delegates
 
 
 class PetView(
@@ -139,7 +125,9 @@ class PetView(
         windowLayout.y = 0
         windowManager.addView(view, windowLayout)
         goingOut = true
+        EventBus.getDefault().post(PetEvent.PetHomeState(false))
         EventBus.getDefault().register(this)
+        PetGlobalData.getInstance().outSide = true
       }
     } catch (e: Exception) {
       e.printStackTrace()
@@ -150,6 +138,8 @@ class PetView(
   fun hide() {
     windowManager.removeView(view)
     goingOut = false
+    PetGlobalData.getInstance().outSide = false
+    EventBus.getDefault().post(PetEvent.PetHomeState(true))
     EventBus.getDefault().unregister(this)
   }
 

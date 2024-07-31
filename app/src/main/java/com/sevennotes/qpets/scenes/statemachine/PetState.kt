@@ -1,6 +1,5 @@
 package com.sevennotes.qpets.scenes.statemachine
 
-import android.util.Log
 import com.sevennotes.qpets.events.UpdateWindowEvent
 import com.sevennotes.qpets.global.PetGlobalData
 import com.sevennotes.qpets.scenes.PetContext
@@ -114,7 +113,6 @@ class PetBTManager(context: PetContext) : BehaviourTreeManager<PetContext>(conte
 
       condition {
         val state = it.isInState<PetState.DieState>()
-        Log.d("test", "current state is dieState: $state , current state : ${it.stateMachine.currentState()}")
         return@condition state
       }
 
@@ -127,8 +125,6 @@ class PetBTManager(context: PetContext) : BehaviourTreeManager<PetContext>(conte
           FAILURE
         }
       }
-
-
       sequence {
         condition { it.isInState<PetState.SleepState>() }
         sequence {
